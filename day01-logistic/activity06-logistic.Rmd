@@ -11,9 +11,16 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Again, we will use two packages from Posit: `{tidyverse}` and `{tidymodels}`.
 
-- Below a new R code chunk and write the code to:
+- Below a create new R code chunk and write the code to:
   - Load `{tidyverse}` and `{tidymodels}` and any other packages you want to use.
 - Give your R code chunk a meaningful name, then run your code chunk or knit your document.
+
+```{r load_packages}
+library(ggplot2)
+library(tidyverse)
+library(tidymodels)
+library(ggthemes)
+```
 
 
 
@@ -42,29 +49,69 @@ Read in the `resume` **CSV** file that is in `day01-logistic/data`.
   - *Read* in the *CSV* file from the `data` folder and store it in an R dataframe called `resume`.
 - Give your R code chunk a meaningful name, then run your code chunk or knit your document.
 
+```{r load_data}
+# Read in the CSV file
+resume <- read_csv("data/resume.csv")
+```
 
+```{r}
+# Display the first few rows of the dataframe
+#head(resume)
+```
+
+
+```{r summarize_data}
+# Summarize the data
+#summary(resume)
+```
+
+```{r}
+#glimpse(resume)
+```
+
+```{r}
+# Check for missing values
+#missing_values <- sapply(resume, function(x) sum(is.na(x)))
+#missing_values
+```
 
 Recall that you can use `dplyr::glimpse` to see some meta information about the R data frame.
 After doing this and your review of the data's description page, answer the following questions:
 
 1. Is this an observational study or an experiment?
   Explain.
+  
+  *This is an experiment. This is because some of the variables are being altered/manipulated by the researchers. Random assignmnet of names that signify race and gender. Some varibles have been controlled such as the work experience. In other wordsthe study is an experiment because it involves random assignment and controlled manipulation of variables, enabling the researchers to draw causal conclusions about the impact of race and gender on job application callback rates.*
 
 
 2. The variable of interest is `received_callback`.
   What type of variable is this?
   What do the values represent?
+  
+  *`received_callback`, is a binary categorical variable. This type of variable can take on one of two possible values, indicating whether a call back was received or not.*
 
 
 3. For `received_callback`, create an appropriate data visualization using `{ggplot2}`.
-  Be sure to provide more descriptive labels (both axes labels and value labels - there are many ways to do this) as well as an appropriate title.
+  Be sure to provide more descriptive labels (both axes labels and value labels - there are many ways to do this) as well as an appropriate title.  
+  
+```{r bar_plot}
+# Bar plot for recieved_callback
+ggplot(resume, aes(x = factor(received_callback))) +
+  geom_bar(fill = "pink", color = "black") +
+  scale_x_discrete(labels = c("0" = "No Callback", "1" = "Callback")) +
+  labs(title = "Distribution of Callbacks for Job Applications",
+       x = "Callback Status",
+       y = "Count of Resumes",
+       fill = "Callback Status") +
+  theme_few()
+```
 
 
 4. Below, I provide you with a numerical summary table that should reiterate (i.e., provides numerical values) your plot in (3).
   First, look at each line of code and describe what I am doing.
   Then, replace "verbatim" with "r" before the code chunk title to produce this table.
   
-```{verbatim callback_frequency_table}
+```{r callback_frequency_table}
 resume %>% 
   mutate(received_callback = case_when(
     received_callback == 0 ~ "No",
@@ -79,6 +126,7 @@ resume %>%
 
 5. Using the output from (3) and (4), what do you notice?
 
+*The percentage of those that that received is very small (8%). Both the plot and the table highlight the disparity in callback rates, showing that only a small fraction of resumes received a callback, which aligns with the data visualization's visual representation.* 
 
 ## Probability and odds
 
@@ -86,9 +134,19 @@ Using your output from (3) and (4), answer the following questions:
 
 6. What is the probability that a randomly selected résumé/person will be called back?
 
+*P(callback) = resume received callback/total resumes = 392/4478 = 0.0805 = 8%*
 
 7. What are the [**odds**](https://en.wikipedia.org/wiki/Odds) that a randomly selected résumé/person will be called back?
 
+*The odds of an event occurring are calculated as the ratio of the probability of the event happening to the probability of the event not happening. Using the given data:*
+
+*Probability of receiving a callback, p(callback), is 0.0805*
+
+*Probability of not receiving a callback, p(no callback), is 1 - 0.0805 = 0.9195.*
+
+*Odds(callback) = p(callback)/p(no callback) = 0.0805/0.9195 = 0.0875*
+
+*This can also be expressed as approximately 1 to 11.43, meaning for every 1 résumé that receives a callback, about 11.43 résumés do not receive a callback.*
 
 ## Logistic regression
 
@@ -116,7 +174,7 @@ Below is a two-way table (also known as a contingency table or crosstable), wher
 Note that the values in each column add to 100%.
 Replace "verbatim" with "r" before the code chunk title to produce this table.
 
-```{verbatim crosstable}
+```{r crosstable}
 resume %>% 
   mutate(received_callback = case_when(
     received_callback == 0 ~ "No",
@@ -142,9 +200,15 @@ Using the above table, answer the following question:
 
 6. What is the probability that a randomly selected résumé/person perceived as Black will be called back?
 
+*Probability of callback for Black applicants: 𝑃(callback∣Black)= 6.45% = 0.0645*
 
 7. What are the **odds** that a randomly selected résumé/person perceived as Black will be called back?
 
+To find the odds that a randomly selected résumé/person perceived as Black will be called back, we use the odds formula:
+
+*Odds=𝑃(callback∣Black)/1−𝑃(callback∣Black)*
+
+*Odds(Black) = 0.0645/1-0.0645 = 0.0645/0.9355 = 0.0689*
 
 This process of calculating conditional (e.g., if a résumé/person perceived as Black is called back) odds will be helpful as we fit our logistic model.
 We will now begin to use the `{tidymodel}` method for fitting models.
@@ -152,7 +216,7 @@ A similar approach could be used for linear regression models and you are encour
 
 - Replace "verbatim" with "r" before the code chunk title to produce the logistic model output.
   
-```{verbatim logistic-model}
+```{r logistic-model}
 # The {tidymodels} method for logistic regression requires that the response be a factor variable
 resume <- resume %>% 
   mutate(received_callback = as.factor(received_callback))
@@ -173,36 +237,83 @@ After doing this, respond to the following questions:
 
 8. Write the estimated regression equation.
   Round to 3 digits.
+  
+  *`racewhite` is an indicator variable that is 1 if the race is "White" and 0 if the race is "Black" (the reference category).*
+  
+  *log(p/1-p)*
+  
+*−2.675 + 0.438 × `racewhite`*
 
-
-9. Using your equation in (8), write the *simplified* estimated regression equation corresponding to résumés/persons perceived as Black.
+9. Using your equation in (8), write the *simplified* estimated regression equation corresponding to `résumés`/persons perceived as Black.
   Round to 3 digits.
 
+*For `résumés`/persons perceived as Black, the indicator variable `racewhite` is 0. Substituting `racewhite` = 0 into the estimated regression equation:*
+
+*log(p/1-p)*
+
+*−2.675+0.438×0*
+
+*−2.675*
 
 Based on your model, if a randomly selected résumé/person perceived as Black,
 
 10. What are the log-odds that they will be called back?
 
+*−2.675+0.438×0*
+
+*The log-odds that a randomly selected résumé/person perceived as Black will be called back is −2.675*
 
 11. What are the odds that they will be called back?
   How does this relate back to your answer from (7)?
   *Hint*: In (9) you obtained the log-odds (i.e., the natural log-odds).
   How can you back-transform this value to obtain the odds?
 
+*To back-transform the log-odds to obtain the odds, we exponentiate the log-odds value.*
+
+*Odds = e^log-odds*
+
+*Odds = e^−2.675*
+
+*= 0.069*
+
+*In question 7, we calculated the odds of a randomly selected résumé/person perceived as Black being called back using the observed frequencies. The odds calculated from the logistic regression model (0.069) match the odds calculated directly from the observed data (0.0689). This consistency confirms that our model is accurately reflecting the observed data.*
 
 12. What is the probability that will be called back?
   How does this related back to your answer from (6)?
   *Hint* Use the odds in (11) to calculate this value.
+  
+*To find the probability from the odds, we use the relationship between odds and probability:*
 
+*Probability = odds/1 + odds = 0.069/1 + 0.069 = 0.0645*
 
+*In question 6, we calculated the probability of a résumé/person perceived as Black being called back directly from the observed data, which was 0.0645 (or 6.45%).*
 
+*The probability calculated from the odds derived from the logistic regression model (0.0645) matches the observed probability (0.0645). This consistency indicates that our logistic regression model accurately captures the relationship observed in the data.*
 
 13. How does the output from following code relate to what you obtained before (8)?
   How can you use it help you answer (12)?
   Replace "verbatim" with "r" before the code chunk title to produce the logistic model output.
+  
+*Before (8): Estimated Regression Equation*
 
-```{verbatim logistic-model}
-tidy(mult_log_mod, exponentiate = TRUE, conf.int = TRUE) %>% 
+*The estimated regression equation was: −2.675 + 0.438 × `racewhite`*
+
+*Where `racewhite`= 1 if the `résumé` is perceived as White, and 0 if perceived as Black.*
+
+*Exponentiated Output:*
+
+*The exponentiated intercept and coefficients provide the odds and odds ratios:*
+
+*Intercept = e^−2.675 = 0.069*
+
+*`racewhite` = e^0.438 = 1.550*
+
+*These exponentiated values translate the log-odds to odds, making the interpretation more straightforward.*
+
+*To answer Question (12), we needed to calculate the probability of a résumé/person perceived as Black receiving a callback using the odds obtained from the exponentiated intercept.*
+
+```{r logistic-model}
+tidy(resume_mod, exponentiate = TRUE, conf.int = TRUE) %>% 
   knitr::kable(digits = 3)
 ```
 
@@ -224,8 +335,8 @@ The authors do not address this decision in their article or provide any context
 
 - Replace "verbatim" with "r" before the code chunk title to produce this table.
 
-```{verbatim resume-subset}
-resume_subet <- resume %>% 
+```{r resume-subset}
+resume_subset <- resume %>% 
   filter(job_city == "Chicago") %>% 
   mutate(race = case_when(
          race == "white" ~ "White",
@@ -240,7 +351,15 @@ resume_subet <- resume %>%
 
 Describe what the above code does in the context of this problem.
 
+*`filter(job_city == "Chicago")`: This filters the resume dataset to include only the observations where the job city is Chicago.*
 
+*`mutate(race = case_when(race == "white" ~ "White", TRUE ~ "Black"))`: This modifies the race variable so that it only has two levels: "White" and "Black". If the race is "white", it is recoded to "White"; otherwise, it is recoded to "Black".*
+
+*`mutate(gender = case_when(gender == "f" ~ "female", TRUE ~ "male"))`: This modifies the gender variable so that it only has two levels: "female" and "male". If the gender is "f", it is recoded to "female"; otherwise, it is recoded to "male".*
+
+*`select(received_callback, years_experience, race, gender)`: This selects only the columns received_callback, years_experience, race, and gender from the filtered and mutated dataset.*
+
+*In the context of exploring whether there is a difference in callback rates for Chicago jobs, after adjusting for an applicant's years of experience, race, and gender, this code prepares a subset of the original dataset. This subset contains only the necessary variables and only includes observations relevant to Chicago. *
 
 ## Relationship Exploration
 
@@ -250,9 +369,33 @@ Note that I tried to explore this using `GGally::ggbivariate`, but kept running 
 
 - Create a new R code chunk and create an appropriate data visualization to explore the relationship between `resume_subet` and each of the explanatory variables, then run your code chunk or knit your document.
 
+*To explore the relationship between the `received_callback` response variable and each of the explanatory variables (`years_experience`, `race`, and `gender`) in the `resume_subset` dataset, we can create individual visualizations using `ggplot2.`*
+
+```{r resume_subset_viz}
+# Convert received_callback to a factor for plotting
+resume_subset$received_callback <- as.factor(resume_subset$received_callback)
+
+# Combined plot using facet_grid
+resume_subset_plot <- ggplot(resume_subset, aes(x = years_experience, fill = received_callback)) +
+  geom_histogram(binwidth = 1, position = "dodge") +
+  facet_grid(race ~ gender) +
+  labs(
+    title = "Years of Experience vs. Callback Received by Race and Gender",
+    x = "Years of Experience",
+    y = "Count",
+    fill = "Received Callback"
+  ) +
+  theme_few()
+
+resume_subset_plot
+```
+
+
 After doing this, answer the following question:
 
 14. Describe any patterns. What do you notice?
+
+*This plot is not really good!*
 
 
 ## Fitting the model
@@ -262,6 +405,19 @@ I will keep exploring why I was experiencing issues and update you all with a mo
 Using the logistic model code above, create a new code chunk below to fit the model to address our research question.
 
 Focusing on the estimated coefficient for `years_experience`, we would say:
+
+```{r}
+# Fit the logistic regression model
+logistic_model <- glm(
+  received_callback ~ years_experience + race + gender,
+  data = resume_subset,
+  family = "binomial"
+)
+
+# Display the model summary
+summary(logistic_model)
+```
+
 
 > For each additional year of experience for an applicant in Chicago, we expect the *log odds* of an applicant receiving a call back to increase by 0.045 units.
 > Assuming applicants have similar time in spent in college, similar inferred races, and similar inferred gender.
@@ -273,12 +429,15 @@ $$
 \text{odds} = e^{\log(\text{odds})}
 $$
 
+>Odds = e^0.045 = 1.046
 
 You saw how to do this in (13)
 
 After doing this, answer the following question:
 
 15. Interpret the estimated coefficient for `years_experience`.
+
+>For each additional year of experience, the odds of receiving a callback increase by approximately 1.046 times. This means that for every additional year of experience, the odds of an applicant receiving a callback are about 4.6% higher, holding other factors constant.
 
 ## Assessing model fit
 
@@ -308,9 +467,9 @@ Since Pearson residuals are similar to residuals that we have already explored, 
 - Replace "verbatim" with "r" before the code chunk title to produce this table. 
   You might need to update other R objects in this code - my model was called `mult_log_mod`
   
-```{verbatim residual-plots}
+```{r residual-plots}
 # To store residuals and create row number variable
-mult_log_aug <- augment(mult_log_mod, type.predict = "response", 
+mult_log_aug <- augment(logistic_model, type.predict = "response", 
                       type.residuals = "deviance") %>% 
                       mutate(id = row_number())
 
@@ -330,6 +489,10 @@ labs(x = "id",
      y = "Deviance residuals", 
      title = "Deviance residuals vs. id")
 ```
+
+>This plot shows the relationship between the deviance residuals and the fitted values from the logistic regression model.
+>The presence of two distinct lines is a common occurrence in logistic regression, reflecting the binary nature of the response variable (0 or 1).
+>The red horizontal line at y = 0 indicates the expected residual value of 0 if the model perfectly fit the data.
 
 Here we produced two residual plots: the deviance residuals against the fitted values and the deviance variables against the index id (an index plot).
 The index plot allows us to easily see some of the more extreme observations - there are a lot ($|d_i| > 2$ is quiet alarming).
