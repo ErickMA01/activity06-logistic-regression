@@ -52,15 +52,83 @@ Now...
   - `select` only the variables listed above to want to make viewing/managing the data (and the `augment` output later) easier.
 - Give your R code chunk a meaningful name, then run your code chunk or knit your document.
 
+Load necessary packages
+
+```{r load_packages}
+# Load necessary packages
+library(ggplot2)
+library(tidyverse)
+library(tidymodels)
+library(ggthemes)
+```
+
+
+Load the data
+
+```{r read_data}
+# Read in the CSV file
+nonvoters <- read_csv("data/nonvoters.csv")
+```
+
+
+Select only required variables
+
+```{r select_required_variables}
+# Select the required variables
+nonvoters <- nonvoters %>%
+  select(ppage, educ, race, gender, income_cat, Q30, voter_category)
+
+#head(nonvoters)
+glimpse(nonvoters)
+```
+
+
 After doing this, answer the following questions:
 
 1. Why do you think the authors chose to only include data from people who were eligible to vote for at least four election cycles?
 
++ Establishing Voting Patterns: By focusing on individuals who have been eligible to vote in multiple election cycles, the authors can more accurately assess long-term voting behavior. This helps in distinguishing between those who consistently vote, those who vote sporadically, and those who rarely or never vote.
+
++ Focus on Experienced Voters: Individuals who have been eligible for fewer election cycles might still be forming their voting habits. By including only those eligible for multiple cycles, the study can focus on voters with established behaviors, providing clearer insights into what influences consistent versus sporadic or non-voting behavior.
+
++ Impact of Long-Term Factors: Long-term eligibility allows the study to consider the impact of stable, long-term factors (like age, education, and income) on voting behavior, rather than short-term influences that might affect new voters.
 
 2. In the FiveThirtyEight article, the authors include visualizations of the relationship between the [voter category and demographic variables](https://projects.fivethirtyeight.com/non-voters-poll-2020-election/images/NONVOTERS-1026-1.png?v=411f25ea).
   Select two of these demographic variables.
   Then, for each variable, create and interpret a plot to describe its relationship with `voter_category`.
 
+Relationship Between Voter Category and Education
+
+```{r voting_by_education_distribution}
+# Visualization for education
+ggplot(nonvoters, aes(y = educ, fill = voter_category)) +
+  geom_bar(position = "fill") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Voter Category Distribution by Education",
+    y = "Education Level",
+    x = "Education",
+    fill = "Voter Category"
+  ) +
+  theme_minimal()
+
+```
+
+Relationship Between Voter Category and Race
+
+```{r voting_by_race_distribution}
+# Visualization for race
+ggplot(nonvoters, aes(y = race, fill = voter_category)) +
+  geom_bar(position = "fill") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Voter Category Distribution by Race",
+    y = "Race",
+    x = "Race",
+    fill = "Voter Category"
+  ) +
+  theme_minimal()
+```
 
 
 We need to do some data preparation before we fit our multinomial logistic regression model.
@@ -73,6 +141,41 @@ We need to do some data preparation before we fit our multinomial logistic regre
 - Then, run your code chunk or knit your document.
   Check that your changes are correct by creating a stacked bar graph using your new `Q30` variable as the $y$-axis and the `voter_category` represented with different colors.
   **Challenge**: Can you use the same color palette (*hint*: this is a handy tool, https://pickcoloronline.com/) that $\texttt{FiveThirthyEight}$ used in their article?
+  
+```{r data_preparation}
+# Select the required variables
+nonvoters <- nonvoters %>%
+  select(ppage, educ, race, gender, income_cat, Q30, voter_category)
+
+# Create the new 'party' variable
+nonvoters <- nonvoters %>%
+  mutate(party = case_when(
+    Q30 == 1 ~ "Republican",
+    Q30 == 2 ~ "Democrat",
+    Q30 == 3 ~ "Independent",
+    Q30 == 4 | Q30 == 5 | Q30 == -1 ~ "Other"
+  ))
+
+# Convert voter_category to factor and set the baseline level
+nonvoters <- nonvoters %>%
+  mutate(voter_category = factor(voter_category, levels = c("rarely/never", "sporadic", "always")))
+```
+
+```{r Check_changes}
+# Check the changes by creating a stacked bar graph
+ggplot(nonvoters, aes(y = party, fill = voter_category)) +
+  geom_bar(position = "fill") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Voter Category Distribution by Party",
+    y = "",
+    x = "Party",
+    fill = "Voter Category"
+  ) +
+  #scale_fill_manual(values = c("#ff5a5f", "#00a699", "#fc642d")) + # Using similar colors to FiveThirtyEight
+  theme_minimal()
+```
+
 
 ## Fitting the model
 
@@ -139,14 +242,17 @@ This is using `{tidymodels}`.
 - In the code chunk below, replace "verbatim" with "r", 
 - Provide the code chunk a meaningful name/title, then run it.
   
-```{verbatim}
+```{r multinom_model_fitting}
 # abbreviated recipe from previous activities
 multi_mod <- multinom_reg() %>% 
   set_engine("nnet") %>% 
   fit(voter_category ~ ppage + educ + race + gender + income_cat, data = nonvoters)
 
+multi_mod <- repair_call(multi_mod, data = nonvoters)
+
 tidy(multi_mod) %>% 
   print(n = Inf) # This will display all rows of the tibble
+
 ```
 
 `{tidymodels}` is designed for cross-validation and so there needs to be some "trickery" when we build models using the entire dataset.
@@ -181,11 +287,25 @@ Using your `tidy(multi_mod) %>% print(n = Inf)` output, complete the following i
 
 $$
 \begin{equation*}
-\log\left(\frac{\hat{p}_{\texttt{"always"}}}{\hat{p}_{\texttt{"rarely/never"}}}\right) = \cdots
+\log\left(\frac{\hat{p}_{\texttt{"always"}}}{\hat{p}_{\texttt{"rarely/never"}}}\right) = -1.854 + 0.061 \times \texttt{ppage} - 1.353 \times \texttt{educHigh school or less} - 0.412 \times \texttt{educSome college} \\
+- 0.417 \times \texttt{raceHispanic} - 0.683 \times \texttt{raceOther/Mixed} - 0.211 \times \texttt{genderMale} - 0.756 \times \texttt{income\_catLess than \$40k}
 \end{equation*}
 $$
 
+
 4. For your equation in (3), interpret the slope for `genderMale` in both log-odds and odds.
+
+> The coefficient for genderMale is -0.211.
+
+> Log-Odds Interpretation: Holding all other variables constant, being male (genderMale) decreases the log-odds of being in the "always" voter category compared to the "rarely/never" category by 0.211 units. In other words, males are less likely to be in the "always" voter category compared to females.
+
+> Odds = 𝑒log-odds
+
+> Odds Interpretation: For each unit increase in the genderMale variable (which is coded as 1 for male, 0 otherwise), the odds of being in the "always" voter category versus the "rarely/never" category change by a factor of 𝑒−0.211 (0.809)
+
+> Therefore, males have approximately 0.809 times the odds of being in the "always" voter category compared to females, holding all other variables constant.
+
+> This interpretation gives us insights into how gender influences the likelihood of being a consistent voter compared to rarely or never voting, adjusted for other demographic factors included in the model.
 
 
 **Note**: The interpretation for the slope for `ppage` is a little more difficult to interpret.
@@ -216,7 +336,7 @@ However, we will let R do these calculations.
 - In the code chunk below, replace "verbatim" with "r", 
 - Provide the code chunk a meaningful name/title, then run it.
   
-```{verbatim}
+```{r predicting_with_model}
 voter_aug <- augment(multi_mod, new_data = nonvoters)
 
 voter_aug
@@ -231,7 +351,7 @@ This is still rather difficult to view so a [confusion matrix](https://en.wikipe
 - In the code chunk below, replace "verbatim" with "r", 
 - Provide the code chunk a meaningful name/title, then run it.
   
-```{verbatim}
+```{r confusion_matrix}
 voter_conf_mat <- voter_aug %>% 
   count(voter_category, .pred_class, .drop = FALSE)
 
@@ -247,8 +367,9 @@ We can also visualize how well these predictions fit the original values.
 - In the code chunk below, replace "verbatim" with "r", 
 - Provide the code chunk a meaningful name/title, then run it.
   
-```{verbatim}
-voters %>% 
+```{r visualize_prediction_fit}
+#voters %>%
+voter_conf_mat |>
   ggplot(aes(x = voter_category)) +
   geom_bar() +
   labs(
